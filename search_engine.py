@@ -1,0 +1,65 @@
+import math
+import re
+from collections import Counter, defaultdict
+
+STOPWORDS = {"the", "a", "an", "and", "or", "of", "to", "in", "is", "it", "for", "on"}
+
+def tokenize(text):
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return [w for w in words if w not in STOPWORDS]
+
+class SearchEngine:
+    def __init__(self, k1=1.5, b=0.75):
+        self.index = defaultdict(dict) # word {doc_id: count}
+        self.docs = {}                 # doc_id -> original
+        self.doc_len = {}              # doc_id -> number of words
+        self.k1 = k1
+        self.b = b
+
+
+    def add(self, doc_id, text):
+        tokens = tokenize(text)
+        self.docs[doc_id] = text
+        self.doc_len[doc_id] = len(tokens)
+        for word, count in Counter(tokenize(text)).items():
+            self.index[word][doc_id] = count
+
+    def search(self, query, top_k=5):
+        n_docs = len(self.docs)
+        avg_len = sum(self.doc_len.values()) / n_docs
+        scores = Counter()
+
+
+        for word in tokenize(query):
+            postings = self.index.get(word, {})
+            if not postings:
+                continue
+
+            # Rarity: words found in fewer documents are worth more
+            idf = math.log(1 + (n_docs - len(postings) + 0.5) / (len(postings) + 0.5))
+
+            for doc_id, tf in postings.items():
+                # Length: shorter documents get a small boost
+                length_norm = 1 - self.b + self.b * self.doc_len[doc_id] / avg_len
+                # Frequency: more occurences help, with diminishing returns
+                scores[doc_id] += idf * tf * (self.k1 + 1) / (tf + self.k1 * length_norm)
+
+        return scores.most_common(top_k)
+
+
+
+
+if __name__ == "__main__":
+    engine = SearchEngine()
+    engine.add("doc1", "Python is a popular programming language.")
+    engine.add("doc2", "The python is a large snake.")
+    engine.add("doc3", "Java is a programming language used for apps.")
+
+    for query in ["python", "python programming", "snake", "rust"]:
+        print(f"Search: {query!r}")
+        results = engine.search(query)
+        if not results:
+            print(" No results")
+        for doc_id, score in results:
+            print(f"  {score:.3f}  {doc_id}: {engine.docs[doc_id]}")
+        print()
