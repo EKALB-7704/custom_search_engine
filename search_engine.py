@@ -1,5 +1,6 @@
 import math
 import re
+from pathlib import Path
 from collections import Counter, defaultdict
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "to", "in", "is", "it", "for", "on"}
@@ -24,8 +25,16 @@ class SearchEngine:
         for word, count in Counter(tokenize(text)).items():
             self.index[word][doc_id] = count
 
+    def add_folder(self, folder):
+        for path in sorted(Path(folder).rglob("*")):
+            if path.suffix in {".txt", ".md"}:
+                self.add(str(path), path.read_text(encoding="utf-8", errors="ignore"))
+            
+
     def search(self, query, top_k=5):
         n_docs = len(self.docs)
+        if n_docs == 0:
+            return[]
         avg_len = sum(self.doc_len.values()) / n_docs
         scores = Counter()
 
@@ -51,15 +60,15 @@ class SearchEngine:
 
 if __name__ == "__main__":
     engine = SearchEngine()
-    engine.add("doc1", "Python is a popular programming language.")
-    engine.add("doc2", "The python is a large snake.")
-    engine.add("doc3", "Java is a programming language used for apps.")
+    engine.add_folder("docs")
+    print(f"Indexed {len(engine.docs)} documents")
+    print()
 
-    for query in ["python", "python programming", "snake", "rust"]:
+    for query in ["python", "snake", "coffee brewing"]:
         print(f"Search: {query!r}")
         results = engine.search(query)
         if not results:
-            print(" No results")
+            print("  No results")
         for doc_id, score in results:
             print(f"  {score:.3f}  {doc_id}: {engine.docs[doc_id]}")
         print()
