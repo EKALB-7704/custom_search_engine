@@ -1,13 +1,20 @@
 import math
 import re
+
+
+from nltk.stem import PorterStemmer
 from pathlib import Path
 from collections import Counter, defaultdict
+
+
+
+stemmer = PorterStemmer()
 
 STOPWORDS = {"the", "a", "an", "and", "or", "of", "to", "in", "is", "it", "for", "on"}
 
 def tokenize(text):
     words = re.findall(r"[a-z0-9]+", text.lower())
-    return [w for w in words if w not in STOPWORDS]
+    return [stemmer.stem(w) for w in words if w not in STOPWORDS]
 
 class SearchEngine:
     def __init__(self, k1=1.5, b=0.75):
@@ -56,19 +63,35 @@ class SearchEngine:
         return scores.most_common(top_k)
 
 
-
+def preview(text, length = 80):
+    text = " ".join(text.split())
+    return text if len(text) <= length else text[:length] + "..."
 
 if __name__ == "__main__":
     engine = SearchEngine()
     engine.add_folder("docs")
-    print(f"Indexed {len(engine.docs)} documents")
-    print()
 
-    for query in ["python", "snake", "coffee brewing"]:
-        print(f"Search: {query!r}")
+    print(f"Indexed {len(engine.docs)} documents. Type a search, or 'quit' to exit.")
+
+    while True:
+        try:
+            query = input("\nsearch> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            break
+
+
+        if query.lower() in {"quit", "exit", "q"}:
+            break
+        if not query:
+            continue
+
         results = engine.search(query)
         if not results:
             print("  No results")
-        for doc_id, score in results:
-            print(f"  {score:.3f}  {doc_id}: {engine.docs[doc_id]}")
-        print()
+
+        for rank, (doc_id, score) in enumerate(results, start = 1):
+            print(f"  {rank}. {doc_id}  ({score:.2f})")
+            print(f"     {preview(engine.docs[doc_id])}")
+
+        
